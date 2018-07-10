@@ -1,7 +1,10 @@
 var csv = require("fast-csv");
+const fs = require('fs');
 const path = require('path');
 const matches = path.resolve('ipl/matches.csv');
 const deliveries = path.resolve('ipl/deliveries.csv');
+const matchescsv = path.resolve("ipl/matches_test1.csv");
+
 const matchesPerYear = (matches) => {
     return new Promise(function (resolve, reject) {
         const matchPerYear = {}
@@ -20,143 +23,226 @@ const matchesPerYear = (matches) => {
                 // console.log(matchPerYear);
                 // if (err)
                 //     reject(err);
-                console.log("first one solution");
+                //console.log("first one solution");
                 resolve(matchPerYear);
             });
     });
 }
 
-//matchesPerYear(matches);
-//Common Method to get id's from matches file
-let getIds = function (year, matches) {
+
+const calculateMatchesWonPerYear = (matches) => {
     return new Promise(function (resolve, reject) {
-        let team_ids = [];
-        let stream = csv.fromPath(matches, {
-                headers: true
-            })
-            .on("data", function (match) {
-                stream.pause();
-                if (match.season == year) {
-                    team_ids.push(match.id);
-                }
-                stream.resume();
-            })
-            .on('end', function () {
-                //console.log(team_ids);
-                resolve(team_ids);
-            });
-    });
-};
-
-let checkArray = function (id, team_ids) {
-    let value = false;
-    return new Promise(function (resolve, reject) {
-        // console.log("inside checkarray");
-        for (var each of team_ids) {
-            if (id === each) {
-                value = true;
-            }
-        }
-        resolve(value);
-    });
-
-};
-//third question
-let extraRunsPerTeam = function (year, matches, deliveries) {
-    // change to 2017 for testing
-    let team_ids = getIds(year, matches);
-    return new Promise(function (resolve, reject) {
-        let extra_runs = {};
-        let stream = csv.fromPath(deliveries, {
-                headers: true
-            })
-            .on("data", function (delivery) {
-                stream.pause();
-                team_ids.then(function (ids) {
-                    checkArray(delivery.match_id, ids).then(function (val) {
-                        let idIsPresent = val;
-                        // console.log(idIsPresent);
-                        if (idIsPresent && (delivery != undefined)) {
-                            extra_runs[delivery.bowling_team] = extra_runs.hasOwnProperty(delivery.bowling_team) ? parseInt(extra_runs[delivery.bowling_team]) + parseInt(delivery.extra_runs) :
-                                delivery.extra_runs;
-                        }
-                        stream.resume();
-                    });
-                });
-            })
-            .on('end', function () {
-                //console.log(extra_runs);
-                console.log("finished extra runs");
-
-                resolve(extra_runs);
-            });
-    });
-};
-
-//extraRunsPerTeam(year,matches, deliveries);
-let topEconomicalBowlers = function (year, matches, deliveries) {
-    let balls_array = {};
-    let runs_array = {};
-    let bowler_object = [];
-    // change year to 2017 for testing
-    let team_ids = getIds(year, matches);
-    return new Promise(function (resolve, reject) {
-        let stream = csv.fromPath(deliveries, {
-                headers: true
-            })
-            .on("data", function (delivery) {
-                stream.pause();
-                team_ids.then(function (ids) {
-                    checkArray(delivery.match_id, ids).then(function (val) {
-                        let idIsPresent = val;
-                        if (idIsPresent && (delivery != undefined)) {
-                            if (balls_array.hasOwnProperty(delivery.bowler)) {
-                                balls_array[delivery.bowler] = parseInt(balls_array[delivery.bowler]) + 1;
-                                runs_array[delivery.bowler] = parseInt(runs_array[delivery.bowler]) + parseInt(delivery.total_runs);
-                                if (delivery.wide_runs > 0)
-                                    balls_array[delivery.bowler] = parseInt(balls_array[delivery.bowler]) - 1;
-                                if (delivery.noball_runs > 0)
-                                    balls_array[delivery.bowler] = parseInt(balls_array[delivery.bowler]) - 1;
-
+        let teamWonRecord = {};
+        fs.readFile(matches, function (err, data) {
+            if (err)
+                reject(err);
+            else {
+                data.toString().split("\n").forEach(function (line, index, arr) {
+                    if (index != 0) {
+                        const match = line.split(",");
+                        const winner = match[10];
+                        const season = match[1];
+                        if (winner && season) {
+                            if (teamWonRecord.hasOwnProperty(winner)) {
+                                if (teamWonRecord[winner].hasOwnProperty(season))
+                                    teamWonRecord[winner][season]++;
+                                else
+                                    teamWonRecord[winner][season] = 1;
                             } else {
-                                balls_array[delivery.bowler] = 1;
-                                runs_array[delivery.bowler] = parseInt(delivery.total_runs);
-                                if (delivery.wide_runs > 0)
-                                    balls_array[delivery.bowler] = parseInt(balls_array[delivery.bowler]) - 1;
-                                if (delivery.noball_runs > 0)
-                                    balls_array[delivery.bowler] = parseInt(balls_array[delivery.bowler]) - 1;
-
+                                teamWonRecord[winner] = {};
+                                teamWonRecord[winner][season] = 1;
                             }
                         }
-                        stream.resume();
+                    }
+                })
+            
+            }
+            //console.log(teamWonRecord);
+            resolve(teamWonRecord);
+        })
 
-                    });
-                });
-            })
-            .on('end', function () {
-                for (let each in balls_array) {
-                    bowler_object.push({
-                        'name': each,
-                        'economy_rate': Math.floor(runs_array[each] / (balls_array[each] / 6))
-                    });
+    })
+}
+
+
+function maxRunsPerOver(deliveries) {
+    return new Promise(function (resolve, reject) {
+        let PlayersData = {},
+            previousPlayer = null,
+            players = {};
+        fs.readFile(deliveries, function (err, balls) {
+            if (err) {
+                reject(err)
+            } else {
+                balls.toString().split("\n").forEach(function (ball, index, arr) {
+                    if (index !== 0) {
+                        const player = ball.split(",");
+                        const bowler = player[8];
+                        const totalRuns = player[17];
+                        if (PlayersData.hasOwnProperty(bowler)) {
+                            PlayersData[bowler] += parseInt(totalRuns);
+                            previousPlayer = bowler;
+                            if (players.hasOwnProperty(previousPlayer)) {
+                                if (players[previousPlayer] < PlayersData[previousPlayer])
+                                    players[previousPlayer] = PlayersData[previousPlayer];
+                            }
+                        } else {
+                            PlayersData = {};
+                            PlayersData[bowler] = parseInt(totalRuns);
+                            if (!(players.hasOwnProperty(bowler))) {
+                                players[bowler] = 0;
+                            }
+                        }
+                    }
+                })
+            }
+            //console.log(players);
+            let playersRunsPerOver = [];
+
+            for (let player in players) {
+                let playerObject = {
+                    'name': player,
+                    'data': players[player]
                 }
-                bowler_object.sort(function (a, b) {
-                    return (parseInt(a.economy_rate) - parseInt(b.economy_rate));
-                });
-                // console.log(bowler_object);
-                console.log("finished top eco bowlers");
-                if (bowler_object.length > 10)
-                    bowler_object = bowler_object.slice(0, 10);
-                console.log(bowler_object);
-                resolve(bowler_object);
+                playersRunsPerOver.push(playerObject);
+            }
+            playersRunsPerOver.sort(function (a, b) {
+                if (a.data > b.data)
+                    return -1;
+                else
+                    return 1;
             });
-    });
-};
-//topEconomicalBowlers('2015', matches, deliveries);
-//extraRunsPerTeam('2016',matches,deliveries)
+            // console.log(playersRunsPerOver.slice(0, 10));
+            let maxRunsPerOverData = playersRunsPerOver.slice(0, 10);
+            let playerData = {};
+            maxRunsPerOverData.forEach((player) => {
+                playerData[player.name] = player.data;
+            })
+            //console.log(playerData);
+            resolve(playerData)
+        })
+    })
+}
+
+
+//3.For the year 2016 plot the extra runs conceded per team.
+const getMatchID = (year, matches) => {
+    var matchIds = [];
+    return new Promise(function (resolve, reject) {
+        fs.readFile(matches, function (err, matches) {
+            if (err) {
+                reject(err)
+            } else {
+                matches.toString().split("\n").forEach(function (team, index, arr) {
+                    if (team !== 0) {
+                        const match = team.split(",");
+                        if (year == match[1]) {
+                            matchIds.push(match[0]);
+                        }
+                    }
+                })
+            }
+            //console.log("matchIds");
+            resolve(matchIds)
+        })
+    })
+}
+
+function extraRunsPerTeam(year, matches, deliveries) {
+    return new Promise(async function (resolve, reject) {
+        let extraRunsPerTeam = {}
+        let matchIds = await getMatchID(year, matches);
+        fs.readFile(deliveries, function (err, data) {
+            if (err) {
+                reject(err)
+            } else {
+                data.toString().split("\n").forEach(function (line, index, arr) {
+                    if (index !== 0) {
+                        const delivery = line.split(",")
+                        const bowlingTeam = delivery[3]
+                        const extraRuns = delivery[16]
+                        if (matchIds.includes(delivery[0])) {
+                            if (extraRunsPerTeam.hasOwnProperty(bowlingTeam)) {
+                                extraRunsPerTeam[bowlingTeam] += Number(extraRuns)
+                            } else {
+                                extraRunsPerTeam[bowlingTeam] = Number(extraRuns)
+                            }
+                        }
+                    }
+                })
+            }
+            //console.log("extraRunsPerTeam");
+            resolve(extraRunsPerTeam);
+        })
+    })
+}
+
+
+function topEconomicalBowlers(year, matches, deliveries) {
+    return new Promise(async function (resolve, reject) {
+        let balls = [];
+        let specificYearIds = await getMatchID(year, matches);
+        fs.readFile(deliveries, function (err, data) {
+            if (err) {
+                reject(err)
+            } else {
+                data.toString().split("\n").forEach(function (line, index, arr) {
+                    if (index !== 0) {
+                        const ball = line.split(",")
+                        if (specificYearIds.includes(ball[0])) {
+                            if (!balls[ball[8]]) {
+                                balls[ball[8]] = {
+                                    "total_run": 0,
+                                    "noOfBall": 0,
+                                    "over": 0,
+                                    'economy_rate': 0
+                                };
+                            }
+                            balls[ball[8]].total_run += parseInt(ball[17]);
+                            balls[ball[8]].noOfBall++;
+                            if (ball[10] != 0) {
+                                balls[ball[8]].noOfBall--;
+                            } else if (ball[13] != 0) {
+                                balls[ball[8]].noOfBall--;
+                            }
+                        }
+                    }
+                })
+            }
+            // console.log(balls);
+            let economyRates = [];
+            for (let player in balls) {
+                balls[player].over = parseInt(balls[player].noOfBall) / 6;
+                balls[player].economy_rate = balls[player].total_run / balls[player].over;
+                let playerObject = {
+                    'name': player,
+                    'data': balls[player].economy_rate
+                }
+                economyRates.push(playerObject);
+            }
+            economyRates.sort(function (a, b) {
+                if (parseFloat(a.data.toFixed(3)) < parseFloat(b.data.toFixed(3)))
+                    return -1;
+                else
+                    return 1;
+            });
+            // console.log(economyRates.slice(0, 10));
+            let maxRunsPerOverData = economyRates.slice(0, 10);
+            let playerData = {};
+            maxRunsPerOverData.forEach((player) => {
+                playerData[player.name] = player.data;
+            })
+            //console.log(playerData);
+            resolve(playerData);
+        })
+    })
+}
 module.exports = {
     matchesPerYear: matchesPerYear,
-    getIds: getIds,
+    calculateMatchesWonPerYear: calculateMatchesWonPerYear,
+    getMatchID: getMatchID,
     extraRunsPerTeam: extraRunsPerTeam,
-    topEconomicalBowlers: topEconomicalBowlers
+    topEconomicalBowlers: topEconomicalBowlers,
+    maxRunsPerOver: maxRunsPerOver
+
 }

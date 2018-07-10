@@ -11,20 +11,25 @@ app.use('/assets', express.static('assets'));
 app.get('/', (req, res) => {
     res.sendFile(__dirname + '/index.html');
 })
-app.get('/matchesPerYear', (req, res) => {
-    operations.matchesPerYear(matches).then(function (data) {
+app.get('/matchesPerYear',async (req, res) => {
+    const data= await operations.matchesPerYear(matches);
         res.send(data);
-    });
 })
-app.get('/extraRunsConcededPerTeam', (req, res) => {
-    operations.extraRunsPerTeam('2016',matches,deliveries).then(function (data) {
+app.get('/MatchesWonPerYear',async (req, res) => {
+    const data= await operations.calculateMatchesWonPerYear(matches);
         res.send(data);
-    });
 })
-app.get('/topEconomicalBowlers', (req, res) => {
-    operations.topEconomicalBowlers('2015',matches,deliveries).then(function (data) {
+app.get('/extraRunsConcededPerTeam', async (req, res) => {
+    const data= await operations.extraRunsPerTeam('2016',matches,deliveries);
         res.send(data);
-    });
+})
+app.get('/topEconomicalBowlers',async (req, res) => {
+    const data= await operations.topEconomicalBowlers('2015',matches,deliveries);
+        res.send(data);
+})
+app.get('/maxRunsPerOver', async (req, res) => {
+    const data= await operations.maxRunsPerOver(deliveries);
+        res.send(data);
 })
 
 app.listen(3000);
